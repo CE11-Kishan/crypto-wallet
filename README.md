@@ -48,3 +48,9 @@ export default tseslint.config({
   },
 })
 ```
+
+
+- Click on Add wallet button
+- A popup appears that shows 12 word of seed phrase
+- A accoridan is added for that wallet
+  - If we click create account button it will add one more expandable accordian below that consist of public private keys
