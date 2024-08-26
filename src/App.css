@@ -21,20 +21,32 @@ header{
 .badge-container {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px; /* Space between badges */
+      gap: 30px;
+      height: 70%;
+      justify-content: center;
+      align-items: center;
+      margin-top: 30px;
   }
   
   .badge-container .p-badge {
-      flex: 1 0 21%; /* 21% allows for 4 items per row with some gap */
+      flex: 1 0 30%; /* 21% allows for 4 items per row with some gap */
       text-align: center;
   }
 
   .content{
       padding: 20px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 50px;
   }
   .ellipsis {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       width: 100%; /* Set a width or max-width for the ellipsis to work */
+  }
+
+  .p-dialog .p-dialog-header .p-dialog-title{
+      font-size: 50px;
   }

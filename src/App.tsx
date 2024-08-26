@@ -2,7 +2,7 @@
 import { Dialog } from 'primereact/dialog';
 import './App.css'
 import { Button } from 'primereact/button';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import nacl from "tweetnacl";
 import { generateMnemonic, mnemonicToSeedSync } from "bip39";
 import { derivePath } from "ed25519-hd-key";
@@ -10,36 +10,38 @@ import { Keypair } from "@solana/web3.js";
 
 import { Badge } from 'primereact/badge';
 import { Accordion, AccordionTab } from 'primereact/accordion';
-import { Buffer } from 'buffer';
-import { PublicKey } from 'solana';
+import { Toast } from 'primereact/toast';
+import { RadioButton } from 'primereact/radiobutton';
 
 type Wallet = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      [seed: string]: { publicKey: string; privateKey: any }[];
+      [seed: string]: { publicKey: string; privateKey: any; walletType: string }[];
 }
+
 
 
 function App() {
       const [visible, setVisible] = useState(false);
       const [seedPhrase, setSeedPhrase] = useState<string[]>([]);
       const [wallet, setWallet] = useState<Wallet>({});
+      const [blockchain, setBlockchain] = useState<string>('0');
+      const toast = useRef(null);
 
-
-      const createWallet = () => {
-            const mnemonic = generateMnemonic();
+      const createWallet = async () => {
+            const mnemonic = await generateMnemonic();
             setSeedPhrase(mnemonic.split(' '));
-            const seed = mnemonicToSeedSync(mnemonic).toString('hex');
-
+            const seed = await mnemonicToSeedSync(mnemonic).toString('hex');
             createKeyPair(seed)
+            //setBlockchain(undefined);
       };
 
-      const createKeyPair = (seed: string) => {
+      const createKeyPair = async (seed: string) => {
             const size = Object.keys(wallet).length + 1;
-            const path = `m/44'/501'/${size}'/0'`; // This is the derivation path
-            const derivedSeed = derivePath(path, seed).key;
-            const secret = nacl.sign.keyPair.fromSeed(derivedSeed).secretKey;
+            const path = `m/44'/${blockchain}'/${size}'/0'`; // This is the derivation path
+            const derivedSeed = await derivePath(path, seed).key;
+            const secret = await nacl.sign.keyPair.fromSeed(derivedSeed).secretKey;
 
-            setWallet(prevWallet => {
+            await setWallet(prevWallet => {
                   // Create a copy of the current wallet
                   const newWallet = { ...prevWallet };
 
@@ -51,16 +53,31 @@ function App() {
                   // Add the new key pair to the wallet
                   newWallet[seed].push({
                         privateKey: secret,
-                        publicKey: Keypair.fromSecretKey(secret).publicKey.toBase58()
+                        publicKey: Keypair.fromSecretKey(secret).publicKey.toBase58(),
+                        walletType: blockchain
                   });
 
                   return newWallet;
             });
-            console.log(Keypair.fromSecretKey(secret).publicKey.toBase58());
       }
+
+      const copyToClipboard = (phrase: string) => {
+            navigator.clipboard.writeText(phrase);
+            toast.current.show({ severity: 'info', summary: 'Info', detail: 'Seed Phrase Copied To Clipboard. !!!' });
+      }
+      
+      const getBlockchainBadge = (blockchain: string) => {
+            switch (blockchain){
+                  case '0': return ['info', 'BITCOIN'];
+                  case '60': return ['danger', 'ETHEREUM'];
+                  case '501': return ['success', 'SOLANA'];
+            }
+      }
+
 
       return (
             <main>
+                  <Toast ref={toast} />
                   <header>
                         <h1 style={{ color: 'white' }}>
                               Crypto Wallet - Kishan
@@ -69,14 +86,36 @@ function App() {
                         {/* <i className="pi pi-wallet" style={{ fontSize: '5rem' }}></i> */}
                   </header>
                   <div className="content">
-                        <Button label="Add Wallet" severity="info" onClick={() => { setVisible(true); createWallet(); }} rounded />
-                        <Dialog header="Seed Phrase" visible={visible} style={{ width: '70vw', color: 'black', backgroundColor: 'white', padding: '20px', borderRadius: '10px' }} onHide={() => { if (!visible) return; setVisible(false); }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <div style={{ display: 'flex', margin: '20px', gap: '20px' }}>
+                                    <div className="flex align-items-center">
+                                          <RadioButton inputId="solana" name="blockchain" value="501" onChange={(e) => setBlockchain(e.value)
+                                          } checked={blockchain === '501'} />
+                                          <label htmlFor="solana" className="ml-2">Solana</label>
+                                    </div>
+                                    <div className="flex align-items-center">
+                                          <RadioButton inputId="bitcoin" name="blockchain" value="0" onChange={(e) => setBlockchain(e.value)} checked={blockchain === '0'} />
+                                          <label htmlFor="bitcoin" className="ml-2">Bitcoin</label>
+                                    </div>
+                                    <div className="flex align-items-center">
+                                          <RadioButton inputId="eth" name="blockchain" value="60" onChange={(e) => setBlockchain(e.value)} checked={blockchain === '60'} />
+                                          <label htmlFor="eth" className="ml-2">Ethereum</label>
+                                    </div>
+                              </div>
+                              <Button label="Add Wallet" severity="info" onClick={() => { setVisible(true); createWallet(); }} rounded />
+                        </div>
+
+                        <Dialog draggable={false} header="Seed Phrase" visible={visible} style={{ width: '100vw', height: '100vh', margin: '100px', color: 'black', backgroundColor: 'white', padding: '20px', borderRadius: '10px' }} onHide={() => { if (!visible) return; setVisible(false); }}>
+
                               <div className="badge-container">
                                     {seedPhrase.map((word, index) => (
-                                          <Badge key={index} value={word} />
+                                          <Badge size={'xlarge'} key={index} value={word} />
                                     ))}
+
+                                    {seedPhrase.length > 0 ? <Button style={{ display: 'flex', margin: 'auto', marginTop: '20px' }} onClick={() => copyToClipboard(seedPhrase.join(' '))} label="Copy" icon='pi pi-copy' severity="danger" rounded /> : ''}
                               </div>
                         </Dialog>
+
                   </div>
                   <div className='content'>
                         <Accordion >
@@ -85,9 +124,16 @@ function App() {
                                           <AccordionTab
                                                 style={{ width: '100vw', padding: '0 100px' }}
                                                 key={seed}
-                                                header={'Wallet ' + (i + 1)}
-                                          >
-                                                <div style={{display: 'flex'}}>
+                                                header={() => (
+                                                      <span style={{display: 'flex'}}> 
+                                                          <Badge 
+                                                              value={(i+1)  + '. '+ getBlockchainBadge(wallet[seed][0]['walletType'])[1] + ' Wallet'} 
+                                                              severity={getBlockchainBadge(wallet[seed][0]['walletType'])[0]} 
+                                                          />
+                                                      </span>
+                                                  )}
+>
+                                                <div style={{ display: 'flex' }}>
                                                       <p className="m-0 ellipsis">Seed: {seed}
                                                       </p>
                                                       <Button icon="pi pi-plus" onClick={() => createKeyPair(seed)} rounded text severity="warning" tooltip="Add New Account" tooltipOptions={{ position: 'bottom', mouseTrack: true, mouseTrackTop: 15 }} />
